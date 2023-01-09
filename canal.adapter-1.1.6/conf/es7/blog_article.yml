@@ -1,0 +1,14 @@
+dataSourceKey: defaultDS
+destination: test
+groupId: g1
+esMapping:
+  _index: blog_article
+  _id: _id
+#  upsert: true
+#  pk: id
+  sql: "select a.id as _id, a.title, a.body,
+        a.last_time from article a"
+#  objFields:
+#    _labels: array:;
+  etlCondition: "where a.last_time>={}"
+  commitBatch: 3000

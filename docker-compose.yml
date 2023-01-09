@@ -1,0 +1,92 @@
+version: "3.8"
+services:
+  mysql:
+    image: mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: changeme
+    ports:
+      - 3306:3306
+    volumes:
+      - ./mysql/my.cnf:/etc/mysql/conf.d/config-file.cnf
+    networks:
+      - vlan100
+
+  canal-server:
+    # 2023/01/15 latest v1.1.5
+    image: canal/canal-server
+    environment:
+      canal.serverMode: kafka  # tcp(默认), kafka, RocketMQ
+      canal.auto.scan: false
+      canal.destinations: test
+      canal.instance.mysql.slaveId: 100
+      canal.instance.master.address: mysql:3306
+      canal.instance.dbUsername: canal
+      canal.instance.dbPassword: canal
+      canal.instance.connectionCharset: UTF-8
+      canal.instance.tsdb.enable: true
+      canal.instance.gtidon: false
+      canal.mq.servers: kafka:9092
+      canal.mq.topic: my-topic
+      canal.mq.partition: 0
+      # 对 MQ顺序性 推荐：kafka/rocketmq
+      # MQ https://github.com/alibaba/canal/wiki/Canal-Kafka-RocketMQ-QuickStart
+    ports:
+      - 11110:11110
+      - 11111:11111
+      - 11112:11112
+      - 9100:9100
+    depends_on:
+      - mysql
+      - kafka
+    networks:
+      - vlan100
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - 2181:2181
+    networks:
+      - vlan100
+
+  kafka:
+    image: wurstmeister/kafka
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # my-topic 1 个分区 1 个副本
+      KAFKA_CREATE_TOPICS: "my-topic:1:1"
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+    ports:
+      - 9092:9092
+    depends_on:
+      - zookeeper
+    networks:
+      - vlan100
+
+  elasticsearch:
+    image: elasticsearch:7.16.2
+    environment:
+      discovery.type: "single-node"
+      ES_JAVA_OPTS: "-Xms64m -Xmx128m"
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - vlan100
+
+  kibana:
+    image: kibana:7.16.2
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+    networks:
+      - vlan100
+
+networks:
+  vlan100:
+    driver: bridge
+
